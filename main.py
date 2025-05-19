@@ -1,14 +1,14 @@
 from fastapi import FastAPI
 import uvicorn
 import ollama
-from langchain.vectorstores import Chroma
-from langchain.embeddings import HuggingFaceEmbeddings
+from langchain_community.vectorstores import Chroma
+from langchain_community.embeddings import HuggingFaceEmbeddings
 
 vectorstore = Chroma(persist_directory="./chroma_db", embedding_function=HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2"))
 
 def chatbot(question):
     docs = vectorstore.similarity_search(question, k = 3)
-    context = "\n".join([doc.page.content for doc in docs])
+    context = "\n".join([doc.page_content for doc in docs])
 
     response = ollama.chat(model="llama3", messages=[
         {"role": "system", "content": "You are a helpful assistant answering based on provided documents"},
