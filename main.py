@@ -1,27 +1,34 @@
 from fastapi import FastAPI
 import uvicorn
-import ollama
+from langchain_community.chat_models import ChatOllama
 from langchain_community.vectorstores import Chroma
 from langchain_community.embeddings import HuggingFaceEmbeddings
-
-vectorstore = Chroma(persist_directory="./chroma_db", embedding_function=HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2"))
-
-def chatbot(question):
-    docs = vectorstore.similarity_search(question, k = 3)
-    context = "\n".join([doc.page_content for doc in docs])
-
-    response = ollama.chat(model="llama3", messages=[
-        {"role": "system", "content": "You are a helpful assistant answering based on provided documents"},
-        {"role": "user", "content": f"Context: {context}\nQuestion: {question}"}
-    ])
-
-    return response['message']['content']
+from langchain_core.messages import SystemMessage, HumanMessage
 
 app = FastAPI()
+
+embedding_model = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+vectorstore = Chroma(persist_directory="./chroma_db", embedding_function=embedding_model)
+llm = ChatOllama(model="llama3", temperature=0)
+
+
+def chatbot(question: str) -> str:
+    docs = vectorstore.similarity_search(question, k=3)
+    context = "\n".join([doc.page_content for doc in docs])
+
+    messages = [
+        SystemMessage(content="You are a helpful assistant answering based on provided documents."),
+        HumanMessage(content=f"Context:\n{context}\n\nQuestion: {question}")
+    ]
+
+    response = llm.invoke(messages)
+    return response.content
 
 
 @app.get("/ask")
 def ask(question: str):
     return {"answer": chatbot(question)}
 
-uvicorn.run(app, host="0.0.0.0", port=8000)
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8000)
